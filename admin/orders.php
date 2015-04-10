@@ -117,38 +117,38 @@
         $status = (int)zen_db_prepare_input($_POST['status']);
         if ($status < 1) break;
 
+        $notify = (array_key_exists('notify', $_POST) ? (int)$_POST['notify']: 1);
+
+        $check = zen_order_status_history_update(
+          $oID, $comments, $status, $notify
+        );
+
         $order_updated = false;
-        $check_status = $db->Execute("select customers_name, customers_email_address, orders_status,
-                                      date_purchased, COWOA_order from " . TABLE_ORDERS . "
-                                      where orders_id = '" . (int)$oID . "'");
+        if($check !== false) {
+          $order_updated = true;
 
-        if ( ($check_status->fields['orders_status'] != $status) || zen_not_null($comments)) {
-          $db->Execute("update " . TABLE_ORDERS . "
-                        set orders_status = '" . zen_db_input($status) . "', last_modified = now()
-                        where orders_id = '" . (int)$oID . "'");
+          // Build the email message (so admin emails are sent)
+          $email_subject = EMAIL_TEXT_SUBJECT . ' #' . $oID;
 
-          $customer_notified = '0';
-          if (isset($_POST['notify']) && ($_POST['notify'] == '1')) {
+          $html_msg = array();
+          if ($notify == 1) {
+
 
             $notify_comments = '';
             if (isset($_POST['notify_comments']) && ($_POST['notify_comments'] == 'on') && zen_not_null($comments)) {
               $notify_comments = EMAIL_TEXT_COMMENTS_UPDATE . $comments . "\n\n";
             }
 
-            //send emails
+            $sql =
+              'SELECT `customers_name`, `customers_email_address`, ' .
+              '`date_purchased`, `COWOA_order` ' .
+              'FROM `' . TABLE_ORDERS . '` WHERE `orders_id`=:orders_id:';
+            $sql = $db->bindVars($sql, ':orders_id:', $oID, 'integer');
+            $check_status = $db->Execute($sql);
 
-// BOF COWOA SEND ORDER_STATUS EMAIL
-            if (COWOA_ORDER_STATUS == 'true') {
-              if ($check_status->fields['COWOA_order'] == 1)  {
-
-                $message =
-                    EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID . "\n\n" .
-                    EMAIL_TEXT_INVOICE_URL . ' ' . zen_catalog_href_link(FILENAME_ORDER_STATUS, 'order_id=' . $oID, 'SSL') . "\n\n" .
-                    EMAIL_TEXT_DATE_ORDERED . ' ' . zen_date_long($check_status->fields['date_purchased']) . "\n\n" .
-                    $notify_comments .
-                    EMAIL_TEXT_STATUS_UPDATED . sprintf(EMAIL_TEXT_STATUS_LABEL, $orders_status_array[$status] ) .
-                    EMAIL_TEXT_STATUS_PLEASE_REPLY;
-
+            // BOF COWOA SEND ORDER_STATUS EMAIL
+            if ($check_status->fields['COWOA_order'] == 1) {
+              if (COWOA_ORDER_STATUS == 'true') {
                 $html_msg['EMAIL_CUSTOMERS_NAME']    = $check_status->fields['customers_name'];
                 $html_msg['EMAIL_TEXT_ORDER_NUMBER'] = EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID;
                 $html_msg['EMAIL_TEXT_INVOICE_URL']  = '<a href="' . zen_catalog_href_link(FILENAME_ORDER_STATUS, 'order_id=' . $oID, 'SSL') .'">'.str_replace(':','','Click here to check the status of your order:').'</a>';
@@ -159,21 +159,18 @@
                 $html_msg['EMAIL_TEXT_NEW_STATUS'] = $orders_status_array[$status];
                 $html_msg['EMAIL_TEXT_STATUS_PLEASE_REPLY'] = str_replace('\n','', EMAIL_TEXT_STATUS_PLEASE_REPLY);
 
-                zen_mail($check_status->fields['customers_name'], $check_status->fields['customers_email_address'], EMAIL_TEXT_SUBJECT . ' #' . $oID, $message, STORE_NAME, EMAIL_FROM, $html_msg, 'order_status');
-                $customer_notified = '1';
-              }
-            }
-            if (COWOA_ORDER_STATUS == 'false') {
-              if ($check_status->fields['COWOA_order'] == 1)  {
-
-                $htmlInvoiceURL='';
-                $htmlInvoiceValue='';
-                $message =
+                $notify_comments =
                   EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID . "\n\n" .
+                  EMAIL_TEXT_INVOICE_URL . ' ' . zen_catalog_href_link(FILENAME_ORDER_STATUS, 'order_id=' . $oID, 'SSL') . "\n\n" .
                   EMAIL_TEXT_DATE_ORDERED . ' ' . zen_date_long($check_status->fields['date_purchased']) . "\n\n" .
-                  $notify_comments .
+                  strip_tags($notify_comments) .
                   EMAIL_TEXT_STATUS_UPDATED . sprintf(EMAIL_TEXT_STATUS_LABEL, $orders_status_array[$status] ) .
                   EMAIL_TEXT_STATUS_PLEASE_REPLY;
+              }
+              else {
+                $htmlInvoiceURL='';
+                $htmlInvoiceValue='';
+
                 $html_msg['EMAIL_CUSTOMERS_NAME']    = $check_status->fields['customers_name'];
                 $html_msg['EMAIL_TEXT_ORDER_NUMBER'] = EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID;
                 $html_msg['INTRO_URL_TEXT']        = '';
@@ -185,20 +182,16 @@
                 $html_msg['EMAIL_TEXT_NEW_STATUS'] = $orders_status_array[$status];
                 $html_msg['EMAIL_TEXT_STATUS_PLEASE_REPLY'] = str_replace('\n','', EMAIL_TEXT_STATUS_PLEASE_REPLY);
 
-                zen_mail($check_status->fields['customers_name'], $check_status->fields['customers_email_address'], EMAIL_TEXT_SUBJECT . ' #' . $oID, $message, STORE_NAME, EMAIL_FROM, $html_msg, 'order_status');
-                $customer_notified = '1';
+                $notify_comments =
+                  EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID . "\n\n" .
+                  EMAIL_TEXT_DATE_ORDERED . ' ' . zen_date_long($check_status->fields['date_purchased']) . "\n\n" .
+                  strip_tags($notify_comments) .
+                  EMAIL_TEXT_STATUS_UPDATED . sprintf(EMAIL_TEXT_STATUS_LABEL, $orders_status_array[$status] ) .
+                  EMAIL_TEXT_STATUS_PLEASE_REPLY;
               }
             }
-// EOF COWOA SEND ORDER_STATUS EMAIL
-            if ($check_status->fields['COWOA_order'] != 1)  {
-              $message =
-                EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID . "\n\n" .
-                EMAIL_TEXT_INVOICE_URL . ' ' . zen_catalog_href_link(FILENAME_CATALOG_ACCOUNT_HISTORY_INFO, 'order_id=' . $oID, 'SSL') . "\n\n" .
-                EMAIL_TEXT_DATE_ORDERED . ' ' . zen_date_long($check_status->fields['date_purchased']) . "\n\n" .
-                $notify_comments .
-                EMAIL_TEXT_STATUS_UPDATED . sprintf(EMAIL_TEXT_STATUS_LABEL, $orders_status_array[$status] ) .
-                EMAIL_TEXT_STATUS_PLEASE_REPLY;
-
+            // EOF COWOA SEND ORDER_STATUS EMAIL
+            else {
               $html_msg['EMAIL_CUSTOMERS_NAME']    = $check_status->fields['customers_name'];
               $html_msg['EMAIL_TEXT_ORDER_NUMBER'] = EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID;
               $html_msg['EMAIL_TEXT_INVOICE_URL']  = '<a href="' . zen_catalog_href_link(FILENAME_CATALOG_ACCOUNT_HISTORY_INFO, 'order_id=' . $oID, 'SSL') .'">'.str_replace(':','',EMAIL_TEXT_INVOICE_URL).'</a>';
@@ -210,36 +203,90 @@
               $html_msg['EMAIL_TEXT_STATUS_PLEASE_REPLY'] = str_replace('\n','', EMAIL_TEXT_STATUS_PLEASE_REPLY);
               $html_msg['EMAIL_PAYPAL_TRANSID'] = '';
 
-              zen_mail($check_status->fields['customers_name'], $check_status->fields['customers_email_address'], EMAIL_TEXT_SUBJECT . ' #' . $oID, $message, STORE_NAME, EMAIL_FROM, $html_msg, 'order_status');
-              $customer_notified = '1';
+              $notify_comments =
+                EMAIL_TEXT_ORDER_NUMBER . ' ' . $oID . "\n\n" .
+                EMAIL_TEXT_INVOICE_URL . ' ' . zen_catalog_href_link(FILENAME_CATALOG_ACCOUNT_HISTORY_INFO, 'order_id=' . $oID, 'SSL') . "\n\n" .
+                EMAIL_TEXT_DATE_ORDERED . ' ' . zen_date_long($check_status->fields['date_purchased']) . "\n\n" .
+                strip_tags($notify_comments) .
+                EMAIL_TEXT_STATUS_UPDATED . sprintf(EMAIL_TEXT_STATUS_LABEL, $orders_status_array[$status] ) .
+                EMAIL_TEXT_STATUS_PLEASE_REPLY;
             }
-
-            // PayPal Trans ID, if any
-            $sql = "select txn_id, parent_txn_id from " . TABLE_PAYPAL . " where order_id = :orderID order by last_modified DESC, date_added DESC, parent_txn_id DESC, paypal_ipn_id DESC ";
-            $sql = $db->bindVars($sql, ':orderID', $oID, 'integer');
-            $result = $db->Execute($sql);
-            if ($result->RecordCount() > 0) {
-              $message .= "\n\n" . ' PayPal Trans ID: ' . $result->fields['txn_id'];
-              $html_msg['EMAIL_PAYPAL_TRANSID'] = $result->fields['txn_id'];
-            }
-
-            //send extra emails
-            if (SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO_STATUS == '1' and SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO != '') {
-              zen_mail('', SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO, SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO_SUBJECT . ' ' . EMAIL_TEXT_SUBJECT . ' #' . $oID, $message, STORE_NAME, EMAIL_FROM, $html_msg, 'order_status_extra');
-            }
-          } elseif (isset($_POST['notify']) && ($_POST['notify'] == '-1')) {
-            // hide comment
-            $customer_notified = '-1';
           }
 
-          $db->Execute("insert into " . TABLE_ORDERS_STATUS_HISTORY . "
-                      (orders_id, orders_status_id, date_added, customer_notified, comments)
-                      values ('" . (int)$oID . "',
-                      '" . zen_db_input($status) . "',
-                      now(),
-                      '" . zen_db_input($customer_notified) . "',
-                      '" . zen_db_input($comments)  . "')");
-          $order_updated = true;
+          // Send the customer notification via email
+          if($notify == 1) {
+
+            // Notify observers a customer order status update will be sent.
+            // Observers are allowed to modify the emails.
+            $send_to = $check_status->fields['customers_email_address'];
+            $send_to_name = $check_status->fields['customers_name'];
+            $send_subject = $email_subject;
+            $send_text = $notify_comments;
+            $send_html = $html_msg;
+            $send = true;
+            $zco_notifier->notify(
+              'NOTIFY_BEFORE_SEND_CUSTOMER_ORDER_STATUS_EMAIL',
+              $sql_data_array,
+              $send_subject,
+              $send_text,
+              $send_html,
+              $send,
+              $send_to,
+              $send_to_name
+            );
+
+            if($send) {
+              zen_mail(
+                $send_to_name, $send_to,
+                $send_subject, $send_text,
+                STORE_NAME, EMAIL_FROM,
+                $send_html, 'order_status'
+              );
+            }
+
+            unset($send, $send_to, $send_to_name, $send_subject, $send_text, $send_html);
+          }
+
+          // PayPal Trans ID, if any
+          $sql =
+            'SELECT `txn_id`, `parent_txn_id` FROM `' . TABLE_PAYPAL . '` ' .
+            'WHERE `order_id`=\':orderID\' ' .
+            'ORDER BY `last_modified` DESC, `date_added` DESC, `parent_txn_id` DESC, `paypal_ipn_id` DESC';
+          $sql = $db->bindVars($sql, ':orderID', $details['orders_id'], 'integer');
+          $result = $db->Execute($sql);
+          if($result->RecordCount() > 0) {
+            $notify_comments .= "\n\n" . ' PayPal Trans ID: ' . $result->fields['txn_id'];
+            $email_html['EMAIL_PAYPAL_TRANSID'] = $result->fields['txn_id'];
+          }
+
+          // Notify any observers we will be sending admin "extra order status" emails.
+          // Observers are allowed to modify various aspects of the emails.
+          $send_extra_to_name = '';
+          $send_extra = (SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO_STATUS == '1');
+          $send_extra_to = SEND_EXTRA_ORDERS_STATUS_ADMIN_EMAILS_TO;
+          $zco_notifier->notify(
+            'NOTIFY_BEFORE_SEND_EXTRA_ORDER_STATUS_EMAIL',
+            $sql_data_array,
+            $email_subject,
+            $notify_comments,
+            $html_msg,
+            $send_extra,
+            $send_extra_to,
+            $send_extra_to_name
+          );
+          unset($sql_data_array);
+
+          //send extra emails
+          if($send_extra && zen_not_null($send_extra_to)) {
+            zen_mail(
+              $send_extra_to_name, $send_extra_to,
+              $email_subject, $notify_comments,
+              STORE_NAME, EMAIL_FROM,
+              $html_msg, 'order_status_extra'
+            );
+          }
+          unset($email_subject, $send_extra, $send_extra_to, $send_extra_to_name);
+          unset($notify_comments, $html_msg);
         }
 
         // trigger any appropriate updates which should be sent back to the payment gateway:
@@ -250,7 +297,7 @@
             require_once(DIR_FS_CATALOG_LANGUAGES . $_SESSION['language'] . '/modules/payment/' . $order->info['payment_module_code'] . '.php');
             $module = new $order->info['payment_module_code'];
             if (method_exists($module, '_doStatusUpdate')) {
-              $response = $module->_doStatusUpdate($oID, $status, $comments, $customer_notified, $check_status->fields['orders_status']);
+              $response = $module->_doStatusUpdate($oID, $status, $comments, $notify, $check_status->fields['orders_status']);
             }
           }
         }
@@ -663,20 +710,24 @@ function couponpopupWindow(url) {
         <td class="main"><table border="1" cellspacing="0" cellpadding="5">
           <tr>
             <td class="smallText" align="center"><strong><?php echo TABLE_HEADING_DATE_ADDED; ?></strong></td>
+            <td class="smallText" align="center"><strong><?php echo TABLE_HEADING_UPDATED_BY; ?></strong></td>
             <td class="smallText" align="center"><strong><?php echo TABLE_HEADING_CUSTOMER_NOTIFIED; ?></strong></td>
             <td class="smallText" align="center"><strong><?php echo TABLE_HEADING_STATUS; ?></strong></td>
             <td class="smallText" align="center"><strong><?php echo TABLE_HEADING_COMMENTS; ?></strong></td>
           </tr>
 <?php
-    $orders_history = $db->Execute("select orders_status_id, date_added, customer_notified, comments
-                                    from " . TABLE_ORDERS_STATUS_HISTORY . "
-                                    where orders_id = '" . zen_db_input($oID) . "'
-                                    order by date_added");
+    $sql =
+      'SELECT `orders_status_id`, `date_added`, `customer_notified`, `comments`, `updated_by` ' .
+      'FROM `' . TABLE_ORDERS_STATUS_HISTORY . '` WHERE `orders_id`=:orders_id: ' .
+      'ORDER BY `date_added`';
+    $sql = $db->bindVars($sql, ':orders_id:', $oID, 'integer');
+    $orders_history = $db->Execute($sql);
 
     if ($orders_history->RecordCount() > 0) {
       while (!$orders_history->EOF) {
         echo '          <tr>' . "\n" .
              '            <td class="smallText" align="center">' . zen_datetime_short($orders_history->fields['date_added']) . '</td>' . "\n" .
+             '            <td class="smallText" align="center">' . zen_db_output($orders_history->fields['updated_by']) . '</td>' . "\n" .
              '            <td class="smallText" align="center">';
         if ($orders_history->fields['customer_notified'] == '1') {
           echo zen_image(DIR_WS_ICONS . 'tick.gif', TEXT_YES) . "</td>\n";

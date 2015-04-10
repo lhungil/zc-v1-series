@@ -35,6 +35,7 @@ define('TABLE_HEADING_TOTAL_EXCLUDING_TAX', 'Total (ex)');
 define('TABLE_HEADING_TOTAL_INCLUDING_TAX', 'Total (inc)');
 
 define('TABLE_HEADING_CUSTOMER_NOTIFIED', 'Customer Notified');
+define('TABLE_HEADING_UPDATED_BY', 'Added By');
 define('TABLE_HEADING_DATE_ADDED', 'Date Added');
 
 define('ENTRY_CUSTOMER', 'Customer:');

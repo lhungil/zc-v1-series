@@ -1309,6 +1309,7 @@ CREATE TABLE orders_status_history (
   orders_status_history_id int(11) NOT NULL auto_increment,
   orders_id int(11) NOT NULL default '0',
   orders_status_id int(5) NOT NULL default '0',
+  updated_by varchar(50) NOT NULL default '',
   date_added datetime NOT NULL default '0001-01-01 00:00:00',
   customer_notified int(1) default '0',
   comments text,

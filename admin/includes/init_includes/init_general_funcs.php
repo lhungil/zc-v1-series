@@ -36,6 +36,11 @@ require(DIR_FS_CATALOG . DIR_WS_FUNCTIONS . 'plugin_support.php');
  */
 require(DIR_WS_FUNCTIONS . 'functions_metatags.php');
 
+/**
+ * order status history functions
+ */
+require(DIR_FS_CATALOG . DIR_WS_FUNCTIONS . 'functions_order_status_history.php');
+
 
 // include the list of extra functions
   if ($za_dir = @dir(DIR_WS_FUNCTIONS . 'extra_functions')) {

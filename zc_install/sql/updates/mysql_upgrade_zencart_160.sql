@@ -116,6 +116,9 @@ ALTER TABLE orders_products ADD products_mixed_discount_quantity tinyint( 1 ) NO
 
 ALTER TABLE orders_products_download ADD products_attributes_id int( 11 ) NOT NULL;
 
+ALTER TABLE orders_status_history ADD updated_by varchar( 50 ) NOT NULL DEFAULT '' AFTER orders_status_id;
+ALTER TABLE orders_status_history MODIFY updated_by varchar( 50 ) NOT NULL DEFAULT '';
+
 ALTER TABLE admin MODIFY COLUMN pwd_last_change_date datetime NOT NULL default '0001-01-01 00:00:00';
 ALTER TABLE admin MODIFY COLUMN last_modified datetime NOT NULL default '0001-01-01 00:00:00';
 ALTER TABLE admin MODIFY COLUMN last_login_date datetime NOT NULL default '0001-01-01 00:00:00';

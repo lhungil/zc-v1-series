@@ -25,6 +25,10 @@ require(DIR_WS_FUNCTIONS . 'html_output.php');
  */
 require(DIR_WS_FUNCTIONS . 'functions_email.php');
 /**
+ * order status history functions
+ */
+require(DIR_WS_FUNCTIONS . 'functions_order_status_history.php');
+/**
  * EZ-Pages functions
  */
 require(DIR_WS_FUNCTIONS . 'functions_ezpages.php');

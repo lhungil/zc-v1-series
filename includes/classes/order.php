@@ -719,18 +719,18 @@ class order extends base {
     }
 
     $customer_notification = (SEND_EMAILS == 'true') ? '1' : '0';
-    $sql_data_array = array('orders_id' => $insert_id,
-                            'orders_status_id' => $this->info['order_status'],
-                            'date_added' => 'now()',
-                            'customer_notified' => $customer_notification,
-                            'comments' => $this->info['comments']);
+    zen_order_status_history_update($insert_id, $this->info['comments'], $this->info['order_status'], $customer_notification);
 
-    zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
-
-    $this->notify('NOTIFY_ORDER_DURING_CREATE_ADDED_ORDER_COMMENT', $sql_data_array);
+    // Left to retain compatibility with any 3rd party observers using this hook
+    $this->notify('NOTIFY_ORDER_DURING_CREATE_ADDED_ORDER_COMMENT', array(
+      'orders_id' => $insert_id,
+      'orders_status_id' => $this->info['order_status'],
+      'date_added' => 'now()',
+      'customer_notified' => $customer_notification,
+      'comments' => $this->info['comments']
+    ));
 
     return $insert_id;
-
   }
 
 

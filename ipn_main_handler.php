@@ -329,24 +329,37 @@ Processing...
         if ($_POST['payment_status'] =='Pending') {
           $new_status = (defined('MODULE_PAYMENT_PAYPAL_PROCESSING_STATUS_ID') && (int)MODULE_PAYMENT_PAYPAL_PROCESSING_STATUS_ID > 0 ? (int)MODULE_PAYMENT_PAYPAL_PROCESSING_STATUS_ID : 2);
           ipn_debug_email('Breakpoint: 5h - newer status code: ' . (int)$new_status);
-          $sql = "UPDATE " . TABLE_ORDERS  . "
-                  SET orders_status = " . (int)$new_status . "
-                  WHERE orders_id = '" . (int)$insert_id . "'";
-          $db->Execute($sql);
-          ipn_debug_email('Breakpoint: 5i - order table updated');
         }
+        zen_order_status_history_update(
+          $insert_id,
+          'PayPal status: ' . $_POST['payment_status'] . ' ' . $_POST['pending_reason']. ' @ '.$_POST['payment_date'] . (($_POST['parent_txn_id'] !='') ? "\n" . ' Parent Trans ID:' . $_POST['parent_txn_id'] : '') . "\n" . ' Trans ID:' . $_POST['txn_id'] . "\n" . ' Amount: ' . $_POST['mc_gross'] . ' ' . $_POST['mc_currency'],
+          $new_status,
+          0,
+          'PayPal IPN'
+        );
+
+        // Left to aid with debugging
         $sql_data_array = array('orders_id' => (int)$insert_id,
                                 'orders_status_id' => (int)$new_status,
                                 'date_added' => 'now()',
                                 'comments' => 'PayPal status: ' . $_POST['payment_status'] . ' ' . $_POST['pending_reason']. ' @ '.$_POST['payment_date'] . (($_POST['parent_txn_id'] !='') ? "\n" . ' Parent Trans ID:' . $_POST['parent_txn_id'] : '') . "\n" . ' Trans ID:' . $_POST['txn_id'] . "\n" . ' Amount: ' . $_POST['mc_gross'] . ' ' . $_POST['mc_currency'],
                                 'customer_notified' => 0
                                 );
-        ipn_debug_email('Breakpoint: 5j - order stat hist update:' . print_r($sql_data_array, true));
-        zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
+        ipn_debug_email('Breakpoint: 5i - order stat hist update:' . print_r($sql_data_array, true));
         if (MODULE_PAYMENT_PAYPAL_ADDRESS_OVERRIDE == '1') {
+          zen_order_status_history_update(
+            $insert_id,
+            '**** ADDRESS OVERRIDE ALERT!!! **** CHECK PAYPAL ORDER DETAILS FOR ACTUAL ADDRESS SELECTED BY CUSTOMER!!',
+            $new_status,
+            -1,
+            'PayPal IPN'
+          );
+
+          // Left to aid with debugging
           $sql_data_array['comments'] = '**** ADDRESS OVERRIDE ALERT!!! **** CHECK PAYPAL ORDER DETAILS FOR ACTUAL ADDRESS SELECTED BY CUSTOMER!!';
           $sql_data_array['customer_notified'] = -1;
           zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
+          ipn_debug_email('Breakpoint: 5j - order stat hist update:' . print_r($sql_data_array, true));
         }
         ipn_debug_email('Breakpoint: 5k - OSH update done');
         $order->create_add_products($insert_id, 2);

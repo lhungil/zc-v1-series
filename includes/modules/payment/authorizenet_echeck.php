@@ -436,12 +436,14 @@ class authorizenet_echeck extends base {
    * @return boolean
    */
   function after_process() {
-    global $insert_id, $db;
-    $sql = "insert into " . TABLE_ORDERS_STATUS_HISTORY . " (comments, orders_id, orders_status_id, date_added) values (:orderComments, :orderID, :orderStatus, now() )";
-    $sql = $db->bindVars($sql, ':orderComments', 'eCheck payment.  AUTH: ' . $this->auth_code . '. TransID: ' . $this->transaction_id . '.', 'string');
-    $sql = $db->bindVars($sql, ':orderID', $insert_id, 'integer');
-    $sql = $db->bindVars($sql, ':orderStatus', $this->order_status, 'integer');
-    $db->Execute($sql);
+    global $insert_id;
+    zen_order_status_history_update(
+      $insert_id,
+      'eCheck payment.  AUTH: ' . $this->auth_code . '. TransID: ' . $this->transaction_id . '.',
+      $this->order_status,
+      -1,
+      'Authorize.NET'
+    );
     return false;
   }
   /**
@@ -771,16 +773,13 @@ class authorizenet_echeck extends base {
         $messageStack->add_session($response_alert, 'error');
       } else {
         // Success, so save the results
-        $sql_data_array = array('orders_id' => $oID,
-                                'orders_status_id' => (int)$new_order_status,
-                                'date_added' => 'now()',
-                                'comments' => 'REFUND INITIATED. Trans ID:' . $response[6] . ' ' . $response[4]. "\n" . ' Gross Refund Amt: ' . $response[9] . "\n" . $refundNote,
-                                'customer_notified' => 0
-                             );
-        zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
-        $db->Execute("update " . TABLE_ORDERS  . "
-                      set orders_status = '" . (int)$new_order_status . "'
-                      where orders_id = '" . (int)$oID . "'");
+        zen_order_status_history_update(
+          $oID,
+          'REFUND INITIATED. Trans ID:' . $response[6] . ' ' . $response[4]. "\n" . ' Gross Refund Amt: ' . $response[9] . "\n" . $refundNote,
+          $new_order_status,
+          0
+        );
+
         $messageStack->add_session(sprintf(MODULE_PAYMENT_AUTHORIZENET_ECHECK_TEXT_REFUND_INITIATED, $response[9], $response[6]), 'success');
         return true;
       }
@@ -848,16 +847,13 @@ class authorizenet_echeck extends base {
         $messageStack->add_session($response_alert, 'error');
       } else {
         // Success, so save the results
-        $sql_data_array = array('orders_id' => (int)$oID,
-                                'orders_status_id' => (int)$new_order_status,
-                                'date_added' => 'now()',
-                                'comments' => 'FUNDS COLLECTED. Auth Code: ' . $response[4] . "\n" . 'Trans ID: ' . $response[6] . "\n" . ' Amount: ' . ($response[9] == 0.00 ? 'Full Amount' : $response[9]) . "\n" . 'Time: ' . date('Y-m-D h:i:s') . "\n" . $captureNote,
-                                'customer_notified' => 0
-                             );
-        zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
-        $db->Execute("update " . TABLE_ORDERS  . "
-                      set orders_status = '" . (int)$new_order_status . "'
-                      where orders_id = '" . (int)$oID . "'");
+        zen_order_status_history_update(
+          $oID,
+          'FUNDS COLLECTED. Auth Code: ' . $response[4] . "\n" . 'Trans ID: ' . $response[6] . "\n" . ' Amount: ' . ($response[9] == 0.00 ? 'Full Amount' : $response[9]) . "\n" . 'Time: ' . date('Y-m-D h:i:s') . "\n" . $captureNote,
+          $new_order_status,
+          0
+        );
+
         $messageStack->add_session(sprintf(MODULE_PAYMENT_AUTHORIZENET_ECHECK_TEXT_CAPT_INITIATED, ($response[9] == 0.00 ? 'Full Amount' : $response[9]), $response[6], $response[4]), 'success');
         return true;
       }
@@ -903,16 +899,13 @@ class authorizenet_echeck extends base {
         $messageStack->add_session($response_alert, 'error');
       } else {
         // Success, so save the results
-        $sql_data_array = array('orders_id' => (int)$oID,
-                                'orders_status_id' => (int)$new_order_status,
-                                'date_added' => 'now()',
-                                'comments' => 'VOIDED. Trans ID: ' . $response[6] . ' ' . $response[4] . "\n" . $voidNote,
-                                'customer_notified' => 0
-                             );
-        zen_db_perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
-        $db->Execute("update " . TABLE_ORDERS  . "
-                      set orders_status = '" . (int)$new_order_status . "'
-                      where orders_id = '" . (int)$oID . "'");
+        zen_order_status_history_update(
+          $oID,
+          'VOIDED. Trans ID: ' . $response[6] . ' ' . $response[4] . "\n" . $voidNote,
+          $new_order_status,
+          0
+        );
+
         $messageStack->add_session(sprintf(MODULE_PAYMENT_AUTHORIZENET_ECHECK_TEXT_VOID_INITIATED, $response[6], $response[4]), 'success');
         return true;
       }

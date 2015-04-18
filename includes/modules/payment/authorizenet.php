@@ -496,13 +496,15 @@ class authorizenet extends base {
    * @return boolean
    */
   function after_process() {
-    global $insert_id, $db;
+    global $insert_id;
     $this->notify('NOTIFY_PAYMENT_AUTHNETSIM_POSTPROCESS_HOOK', $insert_id);
-    $sql = "insert into " . TABLE_ORDERS_STATUS_HISTORY . " (comments, orders_id, orders_status_id, customer_notified, date_added) values (:orderComments, :orderID, :orderStatus, -1, now() )";
-    $sql = $db->bindVars($sql, ':orderComments', 'Credit Card payment.  AUTH: ' . $this->auth_code . '. TransID: ' . $this->transaction_id . '.', 'string');
-    $sql = $db->bindVars($sql, ':orderID', $insert_id, 'integer');
-    $sql = $db->bindVars($sql, ':orderStatus', $this->order_status, 'integer');
-    $db->Execute($sql);
+    zen_order_status_history_update(
+      $insert_id,
+      'Credit Card payment.  AUTH: ' . $this->auth_code . '. TransID: ' . $this->transaction_id . '.',
+      $this->order_status,
+      -1,
+      'Authorize.NET'
+    );
     return false;
   }
   /**

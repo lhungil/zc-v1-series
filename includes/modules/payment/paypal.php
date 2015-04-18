@@ -417,12 +417,13 @@ class paypal extends base {
     } else {
     // PDT found order to be approved, so add a new OSH record for this order's PP details
       unset($_SESSION['paypal_transaction_PDT_passed']);
-      $sql_data_array= array(array('fieldName'=>'orders_id', 'value'=>$insert_id, 'type'=>'integer'),
-                             array('fieldName'=>'orders_status_id', 'value'=>$this->order_status, 'type'=>'integer'),
-                             array('fieldName'=>'date_added', 'value'=>'now()', 'type'=>'noquotestring'),
-                             array('fieldName'=>'customer_notified', 'value'=>0, 'type'=>'integer'),
-                             array('fieldName'=>'comments', 'value'=>'PayPal status: ' . $this->pdtData['payment_status'] . ' ' . ' @ ' . $this->pdtData['payment_date'] . "\n" . ' Trans ID:' . $this->pdtData['txn_id'] . "\n" . ' Amount: ' . $this->pdtData['mc_gross'] . ' ' . $this->pdtData['mc_currency'] . '.', 'type'=>'string'));
-      $db->perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
+      zen_order_status_history_update(
+        $insert_id,
+        'PayPal status: ' . $this->pdtData['payment_status'] . ' ' . ' @ ' . $this->pdtData['payment_date'] . "\n" . ' Trans ID:' . $this->pdtData['txn_id'] . "\n" . ' Amount: ' . $this->pdtData['mc_gross'] . ' ' . $this->pdtData['mc_currency'] . '.',
+        $this->order_status,
+        0,
+        'PayPal PDT'
+      );
       ipn_debug_email('PDT NOTICE :: Order added: ' . $insert_id . "\n" . 'PayPal status: ' . $this->pdtData['payment_status'] . ' ' . ' @ ' . $this->pdtData['payment_date'] . "\n" . ' Trans ID:' . $this->pdtData['txn_id'] . "\n" . ' Amount: ' . $this->pdtData['mc_gross'] . ' ' . $this->pdtData['mc_currency']);
 
       // store the PayPal order meta data -- used for later matching and back-end processing activities

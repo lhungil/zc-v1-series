@@ -646,11 +646,13 @@ class linkpoint_api extends base {
 
     if ($this->auth_code && $this->transaction_id) $comments .= " " . $this->cc_card_type . " AUTH: " . $this->auth_code . ". TransID: " . $this->transaction_id;
 
-    $sql = "insert into " . TABLE_ORDERS_STATUS_HISTORY . " (comments, orders_id, orders_status_id, customer_notified, date_added) values (:orderComments, :orderID, :orderStatus, -1, now() )";
-    $sql = $db->bindVars($sql, ':orderComments', 'Credit Card payment. ' . $comments, 'string');
-    $sql = $db->bindVars($sql, ':orderID', $insert_id, 'integer');
-    $sql = $db->bindVars($sql, ':orderStatus', $this->order_status, 'integer');
-    $db->Execute($sql);
+    zen_order_status_history_update(
+      $insert_id,
+      'Credit Card payment. ' . $comments,
+      $this->order_status,
+      -1,
+      'Linkpoint'
+    );
     return false;
   }
 
@@ -867,16 +869,17 @@ class linkpoint_api extends base {
    * Update order status and order status history based on admin changes sent to gateway
    */
   function _updateOrderStatus($oID, $new_order_status, $comments) {
-    global $db;
-    $sql_data_array= array(array('fieldName'=>'orders_id', 'value' => $oID, 'type'=>'integer'),
-                           array('fieldName'=>'orders_status_id', 'value' => $new_order_status, 'type'=>'integer'),
-                           array('fieldName'=>'date_added', 'value' => 'now()', 'type'=>'noquotestring'),
-                           array('fieldName'=>'comments', 'value' => $comments, 'type'=>'string'),
-                           array('fieldName'=>'customer_notified', 'value' => 0, 'type'=>'integer'));
-    $db->perform(TABLE_ORDERS_STATUS_HISTORY, $sql_data_array);
-    $db->Execute("update " . TABLE_ORDERS  . "
-                  set orders_status = '" . (int)$new_order_status . "'
-                  where orders_id = '" . (int)$oID . "'");
+    $updated_by = null;
+    if(!IS_ADMIN_FLAG) {
+      $updated_by = 'linkpoint_api';
+    }
+    zen_order_status_history_update(
+      $oID,
+      $comments,
+      $new_order_status,
+      0,
+      $updated_by
+    );
   }
 
   /**
